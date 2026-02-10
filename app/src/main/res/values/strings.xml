@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">连点器</string>
+    <string name="accessibility_description">连点器需要无障碍权限来执行自动点击和手势操作</string>
+    <string name="overlay_notification_channel">连点器服务</string>
+    <string name="overlay_notification_title">连点器运行中</string>
+    <string name="overlay_notification_text">点击展开控制面板</string>
+</resources>
