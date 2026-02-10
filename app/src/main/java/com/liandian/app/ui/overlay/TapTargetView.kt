@@ -25,16 +25,18 @@ class TapTargetView(context: Context) : View(context) {
         strokeWidth = 3f
     }
 
-    private val deletePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(180, 244, 67, 54)
+    private val numberPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
         style = Paint.Style.FILL
-        textSize = 28f
+        textSize = 24f
         textAlign = Paint.Align.CENTER
+        isFakeBoldText = true
     }
 
     private val sizePx = 80
     private val radius = sizePx / 2f
 
+    var index: Int = 0
     var onDelete: (() -> Unit)? = null
 
     fun createLayoutParams(): WindowManager.LayoutParams {
@@ -68,8 +70,8 @@ class TapTargetView(context: Context) : View(context) {
         // 十字线
         canvas.drawLine(radius, 8f, radius, sizePx - 8f, crossPaint)
         canvas.drawLine(8f, radius, sizePx - 8f, radius, crossPaint)
-        // 右上角删除标记
-        canvas.drawText("×", sizePx - 12f, 20f, deletePaint)
+        // 序号
+        canvas.drawText("${index + 1}", radius, radius + 8f, numberPaint)
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -102,10 +104,7 @@ class TapTargetView(context: Context) : View(context) {
                 }
                 MotionEvent.ACTION_UP -> {
                     if (!isDragging) {
-                        // 点击右上角区域 → 删除
-                        if (event.x > sizePx * 0.7f && event.y < sizePx * 0.3f) {
-                            onDelete?.invoke()
-                        }
+                        onDelete?.invoke()
                     }
                     true
                 }

@@ -23,6 +23,10 @@ class GestureEngine {
     private var playJob: Job? = null
     private var recordedEvents: List<GestureEvent> = emptyList()
 
+    var onGestureDispatched: ((Float, Float) -> Unit)?
+        get() = player.onGestureDispatched
+        set(value) { player.onGestureDispatched = value }
+
     fun startRecording() {
         if (_state.value != EngineState.IDLE) return
         recorder.start()

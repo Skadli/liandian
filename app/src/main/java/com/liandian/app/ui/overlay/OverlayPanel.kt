@@ -1,7 +1,10 @@
 package com.liandian.app.ui.overlay
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
@@ -12,6 +15,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.liandian.app.engine.EngineState
 
@@ -116,7 +121,7 @@ fun OverlayPanel(
                     }
                 }
                 IconButton(onClick = onClose) {
-                    Icon(Icons.Default.Close, "关闭")
+                    Icon(Icons.Default.Close, "收起")
                 }
             }
         }
@@ -133,11 +138,57 @@ private fun TapModeContent(
     Text("点数: ${tapPointCount}个", style = MaterialTheme.typography.bodyMedium)
     Spacer(modifier = Modifier.height(8.dp))
 
-    Text("间隔: ${intervalMs}ms", style = MaterialTheme.typography.bodyMedium)
+    var isEditing by remember { mutableStateOf(false) }
+    var editText by remember { mutableStateOf("") }
+    val focusManager = LocalFocusManager.current
+
+    val intervalDisplay = if (intervalMs >= 1000) {
+        "${"%.1f".format(intervalMs / 1000f)}s"
+    } else {
+        "${intervalMs}ms"
+    }
+
+    if (isEditing) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("间隔: ", style = MaterialTheme.typography.bodyMedium)
+            OutlinedTextField(
+                value = editText,
+                onValueChange = { editText = it },
+                modifier = Modifier.weight(1f),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                keyboardActions = KeyboardActions(onDone = {
+                    val value = editText.toLongOrNull()
+                    if (value != null && value in 1..600000) {
+                        onIntervalChange(value)
+                    }
+                    isEditing = false
+                    focusManager.clearFocus()
+                }),
+                singleLine = true,
+                suffix = { Text("ms") }
+            )
+        }
+    } else {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("间隔: ", style = MaterialTheme.typography.bodyMedium)
+            Text(
+                text = intervalDisplay,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.clickable {
+                    editText = intervalMs.toString()
+                    isEditing = true
+                }
+            )
+        }
+    }
     Slider(
         value = intervalMs.toFloat(),
         onValueChange = { onIntervalChange(it.toLong()) },
-        valueRange = 50f..5000f,
+        valueRange = 1f..5000f,
         modifier = Modifier.fillMaxWidth()
     )
 

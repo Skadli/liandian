@@ -7,12 +7,16 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
 import android.graphics.PixelFormat
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.util.TypedValue
 import android.widget.FrameLayout
+import android.widget.TextView
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.ComposeView
@@ -47,6 +51,7 @@ class OverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner {
     private lateinit var windowManager: WindowManager
     private val engine = GestureEngine()
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     // 悬浮窗视图
     private var floatingButtonView: View? = null
@@ -72,6 +77,9 @@ class OverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner {
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, buildNotification())
         lifecycleRegistry.currentState = Lifecycle.State.RESUMED
+        engine.onGestureDispatched = { x, y ->
+            mainHandler.post { showClickEffect(x, y) }
+        }
         showFloatingButton()
     }
 
@@ -119,6 +127,7 @@ class OverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner {
         var initialTouchX = 0f
         var initialTouchY = 0f
         var isDragging = false
+        var exitZoneView: View? = null
 
         container.setOnTouchListener { _, event ->
             when (event.action) {
@@ -133,14 +142,58 @@ class OverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner {
                 MotionEvent.ACTION_MOVE -> {
                     val dx = event.rawX - initialTouchX
                     val dy = event.rawY - initialTouchY
-                    if (dx * dx + dy * dy > 100) isDragging = true
+                    if (dx * dx + dy * dy > 100 && !isDragging) {
+                        isDragging = true
+                        // Show exit zone when drag starts
+                        val exitZone = TextView(this@OverlayService).apply {
+                            text = "拖到此处退出"
+                            setTextColor(android.graphics.Color.WHITE)
+                            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                            gravity = Gravity.CENTER
+                            setBackgroundColor(android.graphics.Color.argb(80, 0, 0, 0))
+                        }
+                        val exitParams = WindowManager.LayoutParams(
+                            WindowManager.LayoutParams.MATCH_PARENT,
+                            (120 * resources.displayMetrics.density).toInt(),
+                            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+                            PixelFormat.TRANSLUCENT
+                        ).apply {
+                            gravity = Gravity.BOTTOM
+                        }
+                        windowManager.addView(exitZone, exitParams)
+                        exitZoneView = exitZone
+                    }
                     params.x = initialX + dx.toInt()
                     params.y = initialY + dy.toInt()
                     windowManager.updateViewLayout(container, params)
+
+                    // Highlight exit zone when near bottom
+                    val screenHeight = resources.displayMetrics.heightPixels
+                    val exitThreshold = screenHeight - (150 * resources.displayMetrics.density).toInt()
+                    exitZoneView?.let { zone ->
+                        if (params.y > exitThreshold) {
+                            zone.setBackgroundColor(android.graphics.Color.argb(200, 244, 67, 54))
+                        } else {
+                            zone.setBackgroundColor(android.graphics.Color.argb(80, 0, 0, 0))
+                        }
+                    }
                     true
                 }
                 MotionEvent.ACTION_UP -> {
-                    if (!isDragging) {
+                    // Remove exit zone
+                    exitZoneView?.let {
+                        try { windowManager.removeView(it) } catch (_: Exception) {}
+                    }
+                    exitZoneView = null
+
+                    val screenHeight = resources.displayMetrics.heightPixels
+                    val exitThreshold = screenHeight - (150 * resources.displayMetrics.density).toInt()
+
+                    if (isDragging && params.y > exitThreshold) {
+                        // Exit service
+                        stopSelf()
+                    } else if (!isDragging) {
                         // 单击 → 展开面板
                         removeFloatingButton()
                         showPanel()
@@ -226,6 +279,26 @@ class OverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner {
         recordOverlayView = view
     }
 
+    private fun showClickEffect(x: Float, y: Float) {
+        val sizePx = (80 * resources.displayMetrics.density).toInt()
+        val halfSize = sizePx / 2
+        val effectView = ClickEffectView(this).apply {
+            windowManager = this@OverlayService.windowManager
+        }
+        val params = WindowManager.LayoutParams(
+            sizePx, sizePx,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            this.x = x.toInt() - halfSize
+            this.y = y.toInt() - halfSize
+        }
+        windowManager.addView(effectView, params)
+        effectView.startAnimation()
+    }
+
     // endregion
 
     // region 引擎操作
@@ -238,10 +311,19 @@ class OverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner {
             windowManager.removeView(target)
             targetViews.remove(target)
             tapPointCount.value = targetViews.size
+            reindexTargets()
         }
+        target.index = targetViews.size
         windowManager.addView(target, params)
         targetViews.add(target)
         tapPointCount.value = targetViews.size
+    }
+
+    private fun reindexTargets() {
+        targetViews.forEachIndexed { i, target ->
+            target.index = i
+            target.invalidate()
+        }
     }
 
     private fun startQuickTap() {
@@ -370,7 +452,7 @@ class OverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner {
         return Notification.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(com.liandian.app.R.string.overlay_notification_title))
             .setContentText(getString(com.liandian.app.R.string.overlay_notification_text))
-            .setSmallIcon(android.R.drawable.ic_menu_compass)
+            .setSmallIcon(com.liandian.app.R.drawable.ic_notification)
             .build()
     }
 

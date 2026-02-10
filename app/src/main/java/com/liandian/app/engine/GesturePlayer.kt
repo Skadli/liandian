@@ -11,6 +11,8 @@ import kotlin.coroutines.coroutineContext
 
 class GesturePlayer {
 
+    var onGestureDispatched: ((Float, Float) -> Unit)? = null
+
     suspend fun play(mode: TaskMode) {
         when (mode) {
             is TaskMode.QuickTap -> playQuickTap(mode.config)
@@ -25,6 +27,7 @@ class GesturePlayer {
                 coroutineContext.ensureActive()
                 val gesture = GestureBridge.buildTap(point.x, point.y)
                 GestureBridge.dispatchGesture(gesture)
+                onGestureDispatched?.invoke(point.x, point.y)
                 delay(config.intervalMs)
             }
         }
@@ -53,5 +56,6 @@ class GesturePlayer {
             )
         }
         GestureBridge.dispatchGesture(gesture)
+        onGestureDispatched?.invoke(event.x, event.y)
     }
 }
