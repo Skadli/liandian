@@ -13,9 +13,9 @@
                 android:centerX="118.2"
                 android:centerY="119.4"
                 android:gradientRadius="118"
-                android:startColor="#00BEE7FF"
-                android:centerColor="#1FBCE6FF"
-                android:endColor="#9CC0E8FF" />
+                android:startColor="#0000897B"
+                android:centerColor="#1F00897B"
+                android:endColor="#9C00897B" />
         </aapt:attr>
     </path>
 
@@ -27,9 +27,9 @@
                 android:centerX="118.2"
                 android:centerY="103"
                 android:gradientRadius="136"
-                android:startColor="#F7FCFF"
-                android:centerColor="#D6EAF9"
-                android:endColor="#A2C4E2" />
+                android:startColor="#26A69A"
+                android:centerColor="#00897B"
+                android:endColor="#00695C" />
         </aapt:attr>
     </path>
 
@@ -42,7 +42,7 @@
                 android:centerY="119.4"
                 android:gradientRadius="84"
                 android:startColor="#6FFFFFFF"
-                android:endColor="#1298D9FF" />
+                android:endColor="#1226A69A" />
         </aapt:attr>
     </path>
 
@@ -54,7 +54,7 @@
                 android:centerX="118.2"
                 android:centerY="58"
                 android:gradientRadius="68"
-                android:startColor="#63FFFFFF"
+                android:startColor="#44FFFFFF"
                 android:endColor="#00FFFFFF" />
         </aapt:attr>
     </path>
@@ -63,23 +63,23 @@
         android:translateX="2"
         android:translateY="2">
         <path
-            android:fillColor="#5A6DB4E9"
+            android:fillColor="#5A1A2A3A"
             android:pathData="M95,66C88,66 82,72 82,79V153C82,161 91,166 98,161L131,138L149,171C152,176 158,178 163,175L170,171C175,168 177,162 174,157L156,124L191,100C198,95 197,84 189,80L102,68C100,67 97,66 95,66Z" />
     </group>
 
     <path
-        android:fillColor="#F5FDFF"
+        android:fillColor="#ECEFF1"
         android:pathData="M95,66C88,66 82,72 82,79V153C82,161 91,166 98,161L131,138L149,171C152,176 158,178 163,175L170,171C175,168 177,162 174,157L156,124L191,100C198,95 197,84 189,80L102,68C100,67 97,66 95,66Z" />
 
     <group
         android:translateX="2"
         android:translateY="2">
         <path
-            android:fillColor="#6273BCEB"
+            android:fillColor="#621A2A3A"
             android:pathData="M129,115C125,115 122,118 122,122V172C122,176 127,179 131,176L147,164L159,186C161,189 165,190 168,188L173,185C176,183 177,179 175,176L163,154L181,142C185,139 184,132 180,130L134,116C132,115 130,115 129,115Z" />
     </group>
 
     <path
-        android:fillColor="#EEFBFF"
+        android:fillColor="#CFD8DC"
         android:pathData="M129,115C125,115 122,118 122,122V172C122,176 127,179 131,176L147,164L159,186C161,189 165,190 168,188L173,185C176,183 177,179 175,176L163,154L181,142C185,139 184,132 180,130L134,116C132,115 130,115 129,115Z" />
 </vector>
