@@ -56,6 +56,8 @@ jobs:
         run: |
           mv app/build/outputs/apk/release/app-release.apk \
             app/build/outputs/apk/release/liandian-${{ steps.version.outputs.VERSION_NAME }}.apk
+          cp app/build/outputs/apk/release/liandian-${{ steps.version.outputs.VERSION_NAME }}.apk \
+            app/build/outputs/apk/release/liandian-latest.apk
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -79,3 +81,27 @@ jobs:
           files: |
             app/build/outputs/apk/release/liandian-${{ steps.version.outputs.VERSION_NAME }}.apk
           generate_release_notes: true
+
+      - name: Update latest release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: 连点器 最新版
+          make_latest: true
+          body: |
+            ## 连点器 最新版 (v${{ steps.version.outputs.VERSION_NAME }})
+
+            此 Release 始终指向最新构建，下载链接固定不变。
+
+            构建编号: #${{ github.run_number }}
+            提交: ${{ github.sha }}
+
+            ### 下载
+            直接下载: https://github.com/${{ github.repository }}/releases/download/latest/liandian-latest.apk
+
+            ### 安装说明
+            1. 下载下方 APK 文件
+            2. 在手机上安装（需开启「允许安装未知来源应用」）
+            3. 打开 App，按提示开启悬浮窗权限和无障碍服务
+          files: |
+            app/build/outputs/apk/release/liandian-latest.apk
