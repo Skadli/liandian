@@ -83,25 +83,32 @@ jobs:
           generate_release_notes: true
 
       - name: Update latest release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: latest
-          name: 连点器 最新版
-          make_latest: true
-          body: |
-            ## 连点器 最新版 (v${{ steps.version.outputs.VERSION_NAME }})
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # 删除旧的 latest release 和 tag（如果存在）
+          gh release delete latest --yes --cleanup-tag 2>/dev/null || true
 
-            此 Release 始终指向最新构建，下载链接固定不变。
+          # 强制创建/更新 latest tag 指向当前 commit
+          git tag -f latest
+          git push -f origin latest
 
-            构建编号: #${{ github.run_number }}
-            提交: ${{ github.sha }}
+          # 创建新的 latest release
+          gh release create latest \
+            --title "连点器 最新版" \
+            --notes "## 连点器 最新版 (v${{ steps.version.outputs.VERSION_NAME }})
 
-            ### 下载
-            直接下载: https://github.com/${{ github.repository }}/releases/download/latest/liandian-latest.apk
+          此 Release 始终指向最新构建，下载链接固定不变。
 
-            ### 安装说明
-            1. 下载下方 APK 文件
-            2. 在手机上安装（需开启「允许安装未知来源应用」）
-            3. 打开 App，按提示开启悬浮窗权限和无障碍服务
-          files: |
+          构建编号: #${{ github.run_number }}
+          提交: ${{ github.sha }}
+
+          ### 下载
+          直接下载: https://github.com/${{ github.repository }}/releases/download/latest/liandian-latest.apk
+
+          ### 安装说明
+          1. 下载下方 APK 文件
+          2. 在手机上安装（需开启「允许安装未知来源应用」）
+          3. 打开 App，按提示开启悬浮窗权限和无障碍服务" \
+            --latest \
             app/build/outputs/apk/release/liandian-latest.apk
