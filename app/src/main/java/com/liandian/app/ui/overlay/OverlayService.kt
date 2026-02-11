@@ -57,6 +57,7 @@ class OverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner {
     private var floatingButtonView: View? = null
     private var panelView: View? = null
     private var recordOverlayView: View? = null
+    private var workingIndicatorView: View? = null
     private val targetViews = mutableListOf<TapTargetView>()
 
     // UI 状态
@@ -213,6 +214,7 @@ class OverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner {
         floatingButtonView = container
     }
 
+    @SuppressLint("ClickableViewAccessibility")
     private fun showPanel() {
         val container = FrameLayout(this).also {
             it.setViewTreeLifecycleOwner(this)
@@ -220,6 +222,19 @@ class OverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner {
         }
         val composeView = ComposeView(this)
         container.addView(composeView)
+
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            val dm = resources.displayMetrics
+            x = (dm.widthPixels - 220 * dm.density).toInt() / 2
+            y = (100 * dm.density).toInt()
+        }
 
         composeView.setContent {
             val engineState by engine.state.collectAsState()
@@ -237,19 +252,23 @@ class OverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner {
                     onStartRecord = { startRecording() },
                     onStartPlayback = { startPlayback() },
                     onStop = { stopEngine() },
-                    onClose = { closePanelAndShow() }
+                    onClose = { closePanelAndShow() },
+                    onEditingChange = { editing ->
+                        val p = panelView?.layoutParams as? WindowManager.LayoutParams ?: return@OverlayPanel
+                        if (editing) {
+                            p.flags = p.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
+                        } else {
+                            p.flags = p.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                        }
+                        try { windowManager.updateViewLayout(panelView, p) } catch (_: Exception) {}
+                    },
+                    onDrag = { dx, dy ->
+                        params.x += dx.toInt()
+                        params.y += dy.toInt()
+                        try { windowManager.updateViewLayout(container, params) } catch (_: Exception) {}
+                    }
                 )
             }
-        }
-
-        val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.CENTER
         }
 
         windowManager.addView(container, params)
@@ -275,8 +294,7 @@ class OverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner {
 
         view.setOnClickListener { stopEngine() }
         windowManager.addView(view, params)
-        // 暂存到 recordOverlayView 复用
-        recordOverlayView = view
+        workingIndicatorView = view
     }
 
     private fun showClickEffect(x: Float, y: Float) {
@@ -331,6 +349,7 @@ class OverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner {
         if (points.isEmpty()) return
         val config = TapConfig(points, intervalMs.value)
         removePanel()
+        lockAllTargets()
         showWorkingIndicator()
         engine.startPlaying(TaskMode.QuickTap(config), serviceScope)
     }
@@ -341,6 +360,9 @@ class OverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner {
         hideAllTargets()
         engine.startRecording()
 
+        // 先显示工作指示器（停止按钮），再添加录制层
+        showWorkingIndicator()
+
         // 添加全屏半透明触摸捕获层
         val overlay = View(this)
         overlay.setBackgroundColor(android.graphics.Color.argb(30, 0, 0, 0))
@@ -348,26 +370,17 @@ class OverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner {
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
             PixelFormat.TRANSLUCENT
         )
 
         overlay.setOnTouchListener { _, event ->
             engine.getRecorder().onTouchEvent(event)
-            // 长按和滑动需要消费事件，Tap 穿透
-            when (event.action) {
-                MotionEvent.ACTION_DOWN -> true
-                MotionEvent.ACTION_UP -> {
-                    // 不消费，让事件穿透到下层
-                    true
-                }
-                else -> true
-            }
+            false // 不消费事件，让触摸穿透到下层应用
         }
 
         windowManager.addView(overlay, params)
         recordOverlayView = overlay
-        showWorkingIndicator()
     }
 
     private fun startPlayback() {
@@ -383,11 +396,14 @@ class OverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner {
             EngineState.RECORDING -> {
                 engine.stopRecording()
                 removeRecordOverlay()
+                removeWorkingIndicator()
+                showAllTargets()
                 showPanel()
             }
             EngineState.PLAYING -> {
                 engine.stopPlaying()
-                removeRecordOverlay()
+                removeWorkingIndicator()
+                unlockAllTargets()
                 showPanel()
             }
             EngineState.IDLE -> {}
@@ -409,8 +425,17 @@ class OverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner {
     }
 
     private fun removeRecordOverlay() {
-        recordOverlayView?.let { windowManager.removeView(it) }
+        recordOverlayView?.let {
+            try { windowManager.removeView(it) } catch (_: Exception) {}
+        }
         recordOverlayView = null
+    }
+
+    private fun removeWorkingIndicator() {
+        workingIndicatorView?.let {
+            try { windowManager.removeView(it) } catch (_: Exception) {}
+        }
+        workingIndicatorView = null
     }
 
     private fun hideAllTargets() {
@@ -419,6 +444,25 @@ class OverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner {
 
     private fun showAllTargets() {
         targetViews.forEach { it.visibility = View.VISIBLE }
+    }
+
+    private fun lockAllTargets() {
+        targetViews.forEach { target ->
+            target.locked = true
+            // 设为不可触摸，让 dispatchGesture 的触摸事件穿透到下层应用
+            val p = target.layoutParams as WindowManager.LayoutParams
+            p.flags = p.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+            try { windowManager.updateViewLayout(target, p) } catch (_: Exception) {}
+        }
+    }
+
+    private fun unlockAllTargets() {
+        targetViews.forEach { target ->
+            target.locked = false
+            val p = target.layoutParams as WindowManager.LayoutParams
+            p.flags = p.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
+            try { windowManager.updateViewLayout(target, p) } catch (_: Exception) {}
+        }
     }
 
     private fun closePanelAndShow() {
@@ -430,7 +474,10 @@ class OverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner {
         removeFloatingButton()
         removePanel()
         removeRecordOverlay()
-        targetViews.forEach { windowManager.removeView(it) }
+        removeWorkingIndicator()
+        targetViews.forEach {
+            try { windowManager.removeView(it) } catch (_: Exception) {}
+        }
         targetViews.clear()
     }
 

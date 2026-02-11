@@ -3,6 +3,8 @@ package com.liandian.app.service
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
 import android.graphics.Path
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 
 object GestureBridge {
 
@@ -11,9 +13,25 @@ object GestureBridge {
 
     fun isAvailable(): Boolean = accessibilityService != null
 
-    fun dispatchGesture(gesture: GestureDescription): Boolean {
+    suspend fun dispatchGesture(gesture: GestureDescription): Boolean {
         val service = accessibilityService ?: return false
-        return service.dispatchGesture(gesture, null, null)
+        return suspendCoroutine { cont ->
+            val dispatched = service.dispatchGesture(
+                gesture,
+                object : AccessibilityService.GestureResultCallback() {
+                    override fun onCompleted(gestureDescription: GestureDescription?) {
+                        cont.resume(true)
+                    }
+                    override fun onCancelled(gestureDescription: GestureDescription?) {
+                        cont.resume(false)
+                    }
+                },
+                null
+            )
+            if (!dispatched) {
+                cont.resume(false)
+            }
+        }
     }
 
     fun buildTap(x: Float, y: Float): GestureDescription {

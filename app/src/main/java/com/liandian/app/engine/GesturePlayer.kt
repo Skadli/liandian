@@ -47,7 +47,7 @@ class GesturePlayer {
         } while (loop)
     }
 
-    private fun dispatchEvent(event: GestureEvent) {
+    private suspend fun dispatchEvent(event: GestureEvent) {
         val gesture = when (event) {
             is GestureEvent.Tap -> GestureBridge.buildTap(event.x, event.y)
             is GestureEvent.LongPress -> GestureBridge.buildLongPress(event.x, event.y, event.duration)

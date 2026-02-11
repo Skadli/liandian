@@ -38,6 +38,7 @@ class TapTargetView(context: Context) : View(context) {
 
     var index: Int = 0
     var onDelete: (() -> Unit)? = null
+    var locked: Boolean = false
 
     fun createLayoutParams(): WindowManager.LayoutParams {
         return WindowManager.LayoutParams(
@@ -83,6 +84,7 @@ class TapTargetView(context: Context) : View(context) {
         var isDragging = false
 
         setOnTouchListener { _, event ->
+            if (locked) return@setOnTouchListener true
             val params = layoutParams as WindowManager.LayoutParams
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
